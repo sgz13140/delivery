@@ -263,7 +263,7 @@ func InitDeliveryConfigWith(homeDir string, deliveryConfigFilePath string) {
 	}
 	bscChainClient = ethclient.NewClient(bscRPCClient)
 
-	tronRPCClient = tron.NewClient(conf.TronRPCUrl)
+	tronRPCClient = tron.NewClient(conf.TronRPCUrl, conf.TronGridApiKey)
 
 	maticClient = ethclient.NewClient(maticRPCClient)
 	// Loading genesis doc

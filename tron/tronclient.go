@@ -12,16 +12,18 @@ import (
 	"github.com/maticnetwork/heimdall/contracts/rootchain"
 	"github.com/maticnetwork/heimdall/tron/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // Client defines typed wrappers for the Tron RPC API.
 type Client struct {
 	client       pb.WalletClient
 	rootchainABI abi.ABI
+	apiKey       string
 }
 
 // NewClient creates a client that uses the given RPC client.
-func NewClient(url string) *Client {
+func NewClient(url string, apiKey string) *Client {
 	conn, err := grpc.Dial(url, grpc.WithInsecure())
 	if err != nil {
 		os.Exit(0)
@@ -33,18 +35,24 @@ func NewClient(url string) *Client {
 	return &Client{
 		client:       pb.NewWalletClient(conn),
 		rootchainABI: rootchainABI,
+		apiKey:       apiKey,
 	}
 }
 
-//
+func (tc *Client) outgoingCtx(ctx context.Context) context.Context {
+	if tc.apiKey == "" {
+		return ctx
+	}
+	return metadata.AppendToOutgoingContext(ctx, "TRON-PRO-API-KEY", tc.apiKey)
+}
+
 // private abi methods
-//
 func getABI(data string) (abi.ABI, error) {
 	return abi.JSON(strings.NewReader(data))
 }
 
 func (tc *Client) TriggerContract(ownerAddress, contractAddress string, data []byte) (*pb.Transaction, error) {
-	response, err := tc.client.TriggerContract(context.Background(),
+	response, err := tc.client.TriggerContract(tc.outgoingCtx(context.Background()),
 		&pb.TriggerSmartContract{
 			OwnerAddress:    common.FromHex("41" + ownerAddress),
 			ContractAddress: common.FromHex(contractAddress),
@@ -63,7 +71,7 @@ func (tc *Client) TriggerContract(ownerAddress, contractAddress string, data []b
 }
 
 func (tc *Client) TriggerConstantContract(contractAddress string, data []byte) ([]byte, error) {
-	response, err := tc.client.TriggerConstantContract(context.Background(),
+	response, err := tc.client.TriggerConstantContract(tc.outgoingCtx(context.Background()),
 		&pb.TriggerSmartContract{
 			OwnerAddress:    nil,
 			ContractAddress: common.FromHex(contractAddress),
@@ -82,7 +90,7 @@ func (tc *Client) TriggerConstantContract(contractAddress string, data []byte) (
 }
 
 func (tc *Client) GetNowBlock(ctx context.Context) (int64, error) {
-	block, err := tc.client.GetNowBlock2(ctx, &pb.EmptyMessage{})
+	block, err := tc.client.GetNowBlock2(tc.outgoingCtx(ctx), &pb.EmptyMessage{})
 	if err != nil {
 		return 0, err
 	}
@@ -141,7 +149,7 @@ func (tc *Client) GetLastChildBlock(contractAddress string) (uint64, error) {
 }
 
 func (tc *Client) BroadcastTransaction(ctx context.Context, trx *pb.Transaction) error {
-	result, err := tc.client.BroadcastTransaction(ctx, trx)
+	result, err := tc.client.BroadcastTransaction(tc.outgoingCtx(ctx), trx)
 	if err != nil {
 		return err
 	}
